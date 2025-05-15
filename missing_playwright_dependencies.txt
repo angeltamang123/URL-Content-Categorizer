@@ -1,0 +1,5 @@
+libicudata.so.70
+libicui18n.so.70
+libicuuc.so.70
+libgstcodecparsers-1.0.so.0
+libavif.so.13
