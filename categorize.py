@@ -14,39 +14,39 @@ class Categorizer:
         self.user_agent = user_agent
         self.scrape_only = scrape_only
 
-        async def _scrape(self):
-            scraper = Scrape_URL(url=self.url, threshold=self.threshold, 
-                                 browser=self.browser, user_agent=self.user_agent,
-                                 scrape_only=self.scrape_only
-                                 )
-            scraper_used, count, content = await scraper.scrape()
-            if self.scrape_only:
-                return None
-            else:
-                return scraper_used, count, content
-            
-        def _detect_interactive_environment():
-            # Checking if the environment is interactive or a script for scraping with Playwright
-            return hasattr(sys, 'ps1') or sys.flags.interactive or "ipykernel" in sys.modules
+    async def _scrape(self):
+        scraper = Scrape_URL(url=self.url, threshold=self.threshold, 
+                                browser=self.browser, user_agent=self.user_agent,
+                                scrape_only=self.scrape_only
+                                )
+        scraper_used, count, content = await scraper.scrape()
+        if self.scrape_only:
+            return None
+        else:
+            return scraper_used, count, content
         
-        def predict(self):
-            if self._detect_interactive_environment():
-                        try:
-                            import nest_asyncio
-                            nest_asyncio.apply()
-                        except ImportError:
-                            eprint("Warning: nest_asyncio not installed. Async operations in interactive environments might behave unexpectedly.")
+    def _detect_interactive_environment():
+        # Checking if the environment is interactive or a script for scraping with Playwright
+        return hasattr(sys, 'ps1') or sys.flags.interactive or "ipykernel" in sys.modules
+    
+    def predict(self):
+        if self._detect_interactive_environment():
+                    try:
+                        import nest_asyncio
+                        nest_asyncio.apply()
+                    except ImportError:
+                        eprint("Warning: nest_asyncio not installed. Async operations in interactive environments might behave unexpectedly.")
 
-            scraper_used, count, content = asyncio.run(self._scrape())
-            if not self.scrape_only:
-                try: 
-                    eprint(f"Using the scraping output of {scraper_used} with word count of {count} \nas input to the model")
-                    space_id = "Vyke2000/WebOrganizer-TopicClassifier-NoURL_on_Gradio_Spaces"
-                    client = Client(space_id)
-                    result = client.predict(content, api_name="/predict")
-                    print(f"The topic is categorized as {result['topic']} with the model being {result['confidence'] * 100}% confident ")
-                except Exception as e:
-                     print("Ops!! Something went wrong while inferring the model: {e}")
+        scraper_used, count, content = asyncio.run(self._scrape())
+        if not self.scrape_only:
+            try: 
+                eprint(f"Using the scraping output of {scraper_used} with word count of {count} \nas input to the model")
+                space_id = "Vyke2000/WebOrganizer-TopicClassifier-NoURL_on_Gradio_Spaces"
+                client = Client(space_id)
+                result = client.predict(content, api_name="/predict")
+                print(f"The topic is categorized as {result['topic']} with the model being {result['confidence'] * 100}% confident ")
+            except Exception as e:
+                    print("Ops!! Something went wrong while inferring the model: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape a webpage with requests and Playwright.")
