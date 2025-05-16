@@ -342,6 +342,7 @@ class Scrape_URL:
         if requests_content_is_junk:
             playwright_count, playwright_content = await self._playwright_scrape()
             if self.scrape_only:
+                    print(playwright_content if playwright_content else f"No content scraped from {self.url}")
                     return playwright_content
             else:
                     return "playwright",playwright_count, playwright_content
