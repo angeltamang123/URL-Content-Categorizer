@@ -2,20 +2,24 @@ import requests, cloudscraper, re, asyncio, sys, argparse, time
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright,TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
 from collections import Counter
-
+import functools
 
 # Helper function to print to stderr
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+  
+print = functools.partial(print, flush=True)
+
 class Scrape_URL:
-    def __init__(self, url, threshold = 80, browser = "Chrome", user_agent = None, requests_failure = False, scrape_only = False ):
+    def __init__(self, url, threshold = 80, browser = "Chrome", user_agent = None, requests_failure = False, scrape_only = False):
         self.url = url
         self.threshold = threshold
         self.browser = browser.lower() 
         self.user_agent = user_agent
         self.requests_failure = requests_failure
         self.scrape_only = scrape_only
+       
 
         self.user_agents = {
             "chromium": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -347,11 +351,13 @@ class Scrape_URL:
             playwright_count, playwright_content = await self._playwright_scrape()
             if playwright_count > requests_count:
                 if self.scrape_only:
+                    print(playwright_content if playwright_content else f"No content scraped from {self.url}")
                     return playwright_content
                 else:
                     return "playwright",playwright_count, playwright_content
             else:
-                if self.scrape_only:
+                if self.scrape_only:             
+                    print(requests_content if requests_content else f"No content scraped from {self.url}")
                     return requests_content
                 else:
                     return "requests", playwright_count ,requests_content
@@ -359,7 +365,9 @@ class Scrape_URL:
         if not self.scrape_only:
             return "requests",requests_count, requests_content
         else:
+            print(requests_content if requests_content else f"No content scraped from {self.url}")
             return requests_content
+        
         
 
 async def main():
@@ -374,11 +382,7 @@ async def main():
 
     scraper = Scrape_URL(url=args.url, threshold=args.threshold, browser=args.browser,user_agent=args.user_agent, scrape_only=args.scrape_only)
     # Scraping job as a script
-    content = await scraper.scrape()
-
-    if args.scrape_only:
-        if content:
-            print(content if content else f"No content scraped from {args.url}")
+    await scraper.scrape()
 
 if __name__ == "__main__":
     if Scrape_URL._detect_interactive_environment():

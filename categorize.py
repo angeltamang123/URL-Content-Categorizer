@@ -6,23 +6,25 @@ import sys, asyncio, argparse
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+
 class Categorizer:
-    def __init__(self, url, threshold = 80, browser = "Chrome", user_agent = None, scrape_only = False):
+    def __init__(self, url, threshold = 80, browser = "Chrome", user_agent = None, scrape_only = False, no_predict=False):
         self.url = url
         self.threshold = threshold
         self.browser = browser 
         self.user_agent = user_agent
         self.scrape_only = scrape_only
+        self.no_predict = self.scrape_only
 
     async def _scrape(self):
         scraper = Scrape_URL(url=self.url, threshold=self.threshold, 
                                 browser=self.browser, user_agent=self.user_agent,
                                 scrape_only=self.scrape_only
                                 )
-        scraper_used, count, content = await scraper.scrape()
         if self.scrape_only:
-            return None
+            await scraper.scrape()
         else:
+            scraper_used, count, content = await scraper.scrape()
             return scraper_used, count, content
         
     def _detect_interactive_environment(self):
@@ -36,10 +38,10 @@ class Categorizer:
                 nest_asyncio.apply()
             except ImportError:
                 eprint("Warning: nest_asyncio not installed. Async operations in interactive environments might behave unexpectedly.")
-
-        scraper_used, count, content = asyncio.run(self._scrape())
+     
         if not self.scrape_only:
             try: 
+                scraper_used, count, content = asyncio.run(self._scrape())
                 eprint(f"Using the scraping output of {scraper_used} with word count of {count} \nas input to the model")
                 space_id = "Vyke2000/WebOrganizer-TopicClassifier-NoURL_on_Gradio_Spaces"
                 client = Client(space_id)
@@ -47,6 +49,8 @@ class Categorizer:
                 print(f"The topic is categorized as {result['topic']} with the model being {result['confidence'] * 100}% confident ")
             except Exception as e:
                     eprint(f"Ops!! Something went wrong while inferring the model: {e}")
+        else:
+            asyncio.run(self._scrape())
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape a webpage with requests and Playwright.")
