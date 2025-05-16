@@ -1,13 +1,8 @@
-import requests
-import cloudscraper
+import requests, cloudscraper, re, asyncio, sys, argparse, time
 from bs4 import BeautifulSoup
-import re
-import asyncio
 from playwright.async_api import async_playwright,TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
-import sys
-import argparse
 from collections import Counter
-import time
+
 
 # Helper function to print to stderr
 def eprint(*args, **kwargs):
@@ -233,6 +228,10 @@ class Scrape_URL:
                 
                 # Timer for waiting page load 
                 async def fetch_with_timeout(page_instance, url, timeout_seconds=60):
+                    """
+                    To-do: The timer cancellation after scraping still doesn't work, 
+                    I need to check it again. For now it works, too
+                    """
                     async def timer():
                         await asyncio.sleep(timeout_seconds)
                         eprint(f"Timeout of {timeout_seconds}s reached!")
@@ -257,6 +256,8 @@ class Scrape_URL:
 
                 wait_duration_ms = 60000
                 wait_duration_s = wait_duration_ms // 1000
+
+
 
                 await fetch_with_timeout(page_instance, self.url, timeout_seconds=wait_duration_s)
 
