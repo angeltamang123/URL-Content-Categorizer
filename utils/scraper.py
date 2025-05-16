@@ -239,11 +239,14 @@ class Scrape_URL:
 
                 # Start the countdown timer task
                 timer_task_handle = asyncio.create_task(
-                    countdown_timer_local(wait_duration_s, page_instance, f"Timeout countdown")
+                    countdown_timer_local(wait_duration_s, page_instance , f"Timeout countdown")
                 )
 
                 # The actual Playwright wait operation
-                await page_instance.wait_for_timeout(wait_duration_ms)
+                main_wait_task = asyncio.create_task(
+                    page_instance.wait_for_timeout(wait_duration_ms)
+                )
+                await main_wait_task
                 html = await page_instance.content()
                 await browser.close()
                 return html
