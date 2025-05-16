@@ -67,11 +67,12 @@ URL-Content-Categorizer$  python categorize.py --url https://angel-tamang.vercel
 ## Consideraions for Usage
 
 > [!Important]
-> Topic-classifer is hosted on a free using my account, so the project shall be used only for testing, personal research,sharing, etc, and not for commercial purposes.
+> Topic-classifer is hosted on a free service using my account, so the project shall be used only for testing, personal research,sharing, etc, and not for commercial purposes.
 > You can use the script to just scrape url with -s flag as it doesn't use the resources inferring the model. However, there are better tools that can be tailered for your custom requirements.
+> The scraping job might fail if a page heavily uses Js and needs browser interactions to get contents.
 
 > [!Warning]
-> Scraping some pages are strictly against their policies. Do check their /robots.txt file before scraping off the content. You are solely responsible for how you use this tool as I assume n liability for any misuse, legal issues, or consequences resulting from scraping protected or restricted content.
+> Scraping some pages are strictly against their policies. Do check their /robots.txt file before scraping off the content. You are solely responsible for how you use this tool as I assume no liability for any misuse, legal issues, or consequences resulting from scraping protected or restricted content.
 
 # Future
 
