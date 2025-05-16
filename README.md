@@ -38,7 +38,7 @@ URL-Content-Categorizer$ playwright install --with-deps
 > If you get error logs like: host OS missing dependencies
 > Then your host OS won't run playwright (an issue I faced during development as my local machine is on Ubuntu 23.04 which is EOS)
 > For this case, you are better off using cloud interactive notebooks(Google Colab, Kaggle Notebooks)
-> If you decided to use kaggle, you need to cd from the console and pip install cloudscraper gradio_client pytest-playwright beautifulsoup4, i.e manually instead of pip install -r requirements.txt.
+> If you decided to use kaggle, you need to cd from the console and then perform the installation of playwright browsers.
 > While in colab using cd command in similar way is only available in colab pro
 
 ## Usage
@@ -67,8 +67,8 @@ URL-Content-Categorizer$  python categorize.py --url https://angel-tamang.vercel
 ## Consideraions for Usage
 
 > [!Important]
-> Topic-classifer is hosted on a free using my account, so the project shall be used only for testing, personal, research,sharing, etc, and not for commercial purposes.
-> You can use the script to just scrape url with -s flag as it doesn't use the model's resources. However, there are better tools that can be tailered for your custom requirements.
+> Topic-classifer is hosted on a free using my account, so the project shall be used only for testing, personal research,sharing, etc, and not for commercial purposes.
+> You can use the script to just scrape url with -s flag as it doesn't use the resources inferring the model. However, there are better tools that can be tailered for your custom requirements.
 
 > [!Warning]
 > Scraping some pages are strictly against their policies. Do check their /robots.txt file before scraping off the content. You are solely responsible for how you use this tool as I assume n liability for any misuse, legal issues, or consequences resulting from scraping protected or restricted content.
