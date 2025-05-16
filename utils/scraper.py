@@ -9,6 +9,10 @@ import argparse
 from collections import Counter
 import time
 
+# Helper function to print to stderr
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
 class Scrape_URL:
     def __init__(self, url, threshold = 80, browser = "Chrome", user_agent = None, requests_failure = False, scrape_only = False ):
         self.url = url
@@ -53,7 +57,7 @@ class Scrape_URL:
         elif browser == "safari":
             return "webkit"
         else:
-            print("The provided browser is not supported by the script!!")
+            eprint("The provided browser is not supported by the script!!")
             sys.exit(1)
     
     def _detect_interactive_environment():
@@ -147,11 +151,11 @@ class Scrape_URL:
 
         if junk_ratio > 0.3: # If 30% of tokens look like junk
             if not self.scrape_only:
-                print(f"[Debug] High junk ratio: {junk_ratio:.2f} ({junk_tokens}/{len(tokens)} tokens).")
+                eprint(f"[Debug] High junk ratio: {junk_ratio:.2f} ({junk_tokens}/{len(tokens)} tokens).")
             return True
         if (word_count - junk_tokens) < min_real_words_for_requests and word_count > 10 : # If few real words and there was some content
             if not self.scrape_only:
-                print(f"[Debug] Low real word count: {word_count - junk_tokens} (Total: {word_count}, Junk: {junk_tokens}).")
+                eprint(f"[Debug] Low real word count: {word_count - junk_tokens} (Total: {word_count}, Junk: {junk_tokens}).")
             return True
 
         return False
@@ -183,15 +187,15 @@ class Scrape_URL:
 
         # Unrecoverable: handle separately
         except (KeyboardInterrupt, SystemExit):
-            print("\n[Unrecoverable] Script interrupted by user or system. Exiting.")
-            print("Exiting...")
+            eprint("\n[Unrecoverable] Script interrupted by user or system. Exiting.")
+            eprint("Exiting...")
             time.sleep(2)
             sys.exit(1)
 
         except Exception as e:
             # Unrecoverable: unexpected bug or system error
-            print(f"[Unrecoverable Error] Unexpected failure during scraping {self.url}: {e}")
-            print("Exiting...")
+            eprint(f"[Unrecoverable Error] Unexpected failure during scraping {self.url}: {e}")
+            eprint("Exiting...")
             time.sleep(2)
             sys.exit(1)
 
@@ -199,25 +203,48 @@ class Scrape_URL:
         if not self.scrape_only:
             print("Playwright scrape job starting....")
 
-        async def countdown_timer(duration):
-            for i in range(duration + 1):
-                print(f"\r{i}/{duration}s", end="", flush=True)
+        # Timer to interactively show process running
+        async def countdown_timer_local(duration_seconds, page_to_monitor, message_prefix="Playwright waiting"):
+            for i in range(duration_seconds + 1):
+                if page_to_monitor.is_closed():
+                    eprint(f"\r{' ' * 70}\r Timer stopped.", flush=True) 
+                    break
+                # Pad with spaces to clear previous longer messages
+                eprint(f"\r{message_prefix}: {i}/{duration_seconds}s{' ' * 20}", end="", flush=True) 
                 await asyncio.sleep(1)
+            if not page_to_monitor.is_closed():
+                eprint(f"\r{message_prefix}: Wait time {duration_seconds}s elapsed.{' ' * 20}", flush=True) 
+            eprint() # Newline after timer completion/stop, to stderr
+
+        timer_task_handle = None # To hold the asyncio.Task for the timer
 
         async def run():
+            nonlocal timer_task_handle # Allow run() to assign to the outer scope timer_task_handle
+            page_instance = None
             async with async_playwright() as p:
+                
                 browser_type = self._browser_type()
                 browser = await getattr(p, browser_type).launch(headless=True)
                 headers = self._get_headers(False)
                 user_agent = self.user_agents[browser_type]
                 context = await browser.new_context(user_agent = user_agent, extra_http_headers=headers)
 
-                page = await context.new_page()
-                await page.goto(self.url, wait_until="domcontentloaded")
-                timer = asyncio.create_task(countdown_timer(60)) # Display minute counter
-                await page.wait_for_timeout(60000) # Wait for a minute
+                page_instance = await context.new_page()
+                await page_instance.goto(self.url, wait_until="domcontentloaded")
+              
+                wait_duration_ms = 60000
+                wait_duration_s = wait_duration_ms // 1000
 
-                html = await page.content()
+                eprint(f"Page loaded. Starting wait for dynamic content/timeout...")
+
+                # Start the countdown timer task
+                timer_task_handle = asyncio.create_task(
+                    countdown_timer_local(wait_duration_s, page_instance, f"Timeout countdown")
+                )
+
+                # The actual Playwright wait operation
+                await page_instance.wait_for_timeout(wait_duration_ms)
+                html = await page_instance.content()
                 await browser.close()
                 return html
 
@@ -233,27 +260,27 @@ class Scrape_URL:
         except PlaywrightTimeoutError as te:
             
             if not self.requests_failure:
-                print(f"[Recoverable] Timeout while loading page: {te}")
+                eprint(f"[Recoverable] Timeout while loading page: {te}")
                 return None, None
             else:
-                print("Scraping job failed!!")
-                print("Exiting...")
+                eprint("Scraping job failed!!")
+                eprint("Exiting...")
                 time.sleep(2)
                 sys.exit(1)
 
         except PlaywrightError as pe:
             if not self.requests_failure:
-                print(f"[Recoverable] Playwright browser error: {pe}")
+                eprint(f"[Recoverable] Playwright browser error: {pe}")
                 return None, None
             else:
-                print("Scraping job failed!!")
-                print("Exiting...")
+                eprint("Scraping job failed!!")
+                eprint("Exiting...")
                 time.sleep(2)
                 sys.exit(1)
 
         except Exception as e:
-            print(f"[Unrecoverable] Unexpected error: {e}")
-            print("Exiting...")
+            eprint(f"[Unrecoverable] Unexpected error: {e}")
+            eprint("Exiting...")
             time.sleep(2)
             sys.exit(1) 
 
@@ -268,7 +295,7 @@ class Scrape_URL:
         # Validaing the url string
         valid = self.validate_url()
         if not valid:
-            print("Please provide a proper url with scheme i.e http/s://www.<your_page>")
+            eprint("Please provide a proper url with scheme i.e http/s://www.<your_page>")
             time.sleep(2)
             sys.exit(1)
 
@@ -332,7 +359,7 @@ if __name__ == "__main__":
             import nest_asyncio
             nest_asyncio.apply()
         except ImportError:
-            print("Warning: nest_asyncio not installed. Async operations in interactive environments might behave unexpectedly.")
+            eprint("Warning: nest_asyncio not installed. Async operations in interactive environments might behave unexpectedly.")
             
     asyncio.run(main())
 
