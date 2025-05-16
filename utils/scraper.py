@@ -239,7 +239,7 @@ class Scrape_URL:
 
                 # Start the countdown timer task
                 timer_task_handle = asyncio.create_task(
-                    countdown_timer_local(wait_duration_s, page_instance , f"Timeout countdown")
+                    countdown_timer_local(wait_duration_s, page_instance , f"Playwright working")
                 )
 
                 # The actual Playwright wait operation

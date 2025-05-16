@@ -1,9 +1,0 @@
-[Recoverable] Playwright browser error: BrowserType.launch: Executable doesn't exist at /home/angel-tamang/.cache/ms-playwright/chromium_headless_shell-1169/chrome-linux/headless_shell
-╔════════════════════════════════════════════════════════════╗
-║ Looks like Playwright was just installed or updated.       ║
-║ Please run the following command to download new browsers: ║
-║                                                            ║
-║     playwright install                                     ║
-║                                                            ║
-║ <3 Playwright Team                                         ║
-╚════════════════════════════════════════════════════════════╝
