@@ -25,17 +25,17 @@ class Categorizer:
         else:
             return scraper_used, count, content
         
-    def _detect_interactive_environment():
+    def _detect_interactive_environment(self):
         # Checking if the environment is interactive or a script for scraping with Playwright
         return hasattr(sys, 'ps1') or sys.flags.interactive or "ipykernel" in sys.modules
     
     def predict(self):
         if self._detect_interactive_environment():
-                    try:
-                        import nest_asyncio
-                        nest_asyncio.apply()
-                    except ImportError:
-                        eprint("Warning: nest_asyncio not installed. Async operations in interactive environments might behave unexpectedly.")
+            try:
+                import nest_asyncio
+                nest_asyncio.apply()
+            except ImportError:
+                eprint("Warning: nest_asyncio not installed. Async operations in interactive environments might behave unexpectedly.")
 
         scraper_used, count, content = asyncio.run(self._scrape())
         if not self.scrape_only:
@@ -46,7 +46,7 @@ class Categorizer:
                 result = client.predict(content, api_name="/predict")
                 print(f"The topic is categorized as {result['topic']} with the model being {result['confidence'] * 100}% confident ")
             except Exception as e:
-                    print("Ops!! Something went wrong while inferring the model: {e}")
+                    eprint("Ops!! Something went wrong while inferring the model: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape a webpage with requests and Playwright.")
