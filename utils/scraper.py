@@ -10,12 +10,13 @@ from collections import Counter
 import time
 
 class Scrape_URL:
-    def __init__(self, url, threshold = 80, browser = "Chrome", user_agent = None, requests_failure= False ):
+    def __init__(self, url, threshold = 80, browser = "Chrome", user_agent = None, requests_failure = False, scrape_only = False ):
         self.url = url
         self.threshold = threshold
-        self.browser = browser
+        self.browser = browser.lower() 
         self.user_agent = user_agent
         self.requests_failure = requests_failure
+        self.scrape_only = scrape_only
 
         self.user_agents = {
             "chromium": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -33,16 +34,17 @@ class Scrape_URL:
         Checks if the url supplied is valid with regex
         the url with the protocol must be supplied for playwright to work 
         """
-        url_pattern = r"^(https?://)?"  # http or https
+        url_pattern = r"^https?://"  # http or https
         url_pattern += r"([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}"  # Domain name
         url_pattern += r"(:[0-9]+)?"  # Optional port number
         url_pattern += r"(/.*)?$"  # Optional path and query parameters
 
         match = re.match(url_pattern, self.url)
+
         return bool(match)
     
     def _browser_type(self):
-        browser = self.browser.lower()
+        browser = self.browser
         chromium = ["chrome", "brave", "microsoft edge", "opera", "vivaldi", "libreWolf"]
         if browser in chromium:
             return "chromium"
@@ -64,7 +66,7 @@ class Scrape_URL:
         then only we use playwright. Only made this function so that the flow is clear and documentation purposes
         """
 
-        return True if count < self.threshold else False
+        return count < self.threshold
     
     def _get_headers(self, return_ua = True):
         """
@@ -105,9 +107,59 @@ class Scrape_URL:
 
         return all_text
     
+    def _is_content_junk(self, text_content, word_count):
+        """
+        Analyzes text content to determine if it's mostly junk (CSS classes, inline styles, etc.).
+        """
+        if not text_content or word_count == 0:
+            return False
+        
+        tokens = text_content.split() 
+
+        if not tokens:
+            return False
+
+        junk_tokens = 0
+
+        # Regex for common CSS class patterns (like css-xxxx, MuiXxxx, names with multiple hyphens)
+        # and simple inline style fragments.
+        css_class_pattern = re.compile(
+            r"^(css-|mui-|data-|aria-|js-|wp-|fa-|glyphicon-)|(^([a-zA-Z]+-){2,})|(\w+:\s*[\w#-]+(?:;|\s|$))"
+        )
+
+
+        for token in tokens:
+            if css_class_pattern.search(token.lower()): # make it case-insensitive for Mui etc.
+                junk_tokens += 1
+            elif '{' in token or '}' in token or ';' in token and ':' in token: # simple check for js/css code
+                if len(token) < 30 : # only for relatively short tokens
+                    junk_tokens += 1
+
+
+        if not tokens: 
+            return False
+
+        junk_ratio = junk_tokens / len(tokens)
+
+        # Decision: if > 50% of tokens are junk, or if very few "real" words remain.
+        # These thresholds might need tuning.
+        min_real_words_for_requests = self.threshold * 0.75 # e.g., if threshold is 80, need at least 60 real words
+
+        if junk_ratio > 0.3: # If 30% of tokens look like junk
+            if not self.scrape_only:
+                print(f"[Debug] High junk ratio: {junk_ratio:.2f} ({junk_tokens}/{len(tokens)} tokens).")
+            return True
+        if (word_count - junk_tokens) < min_real_words_for_requests and word_count > 10 : # If few real words and there was some content
+            if not self.scrape_only:
+                print(f"[Debug] Low real word count: {word_count - junk_tokens} (Total: {word_count}, Junk: {junk_tokens}).")
+            return True
+
+        return False
+    
     def _requests_scrape(self):
         # Returns count of words in scraped url and the content if successful
-        print("Requests scrape job starting....")
+        if not self.scrape_only:
+            print("Requests scrape job starting....")
         # cloudscraper makes request in same way as requests while handling cloudflare block
         scraper = cloudscraper.create_scraper()
         try:
@@ -117,7 +169,8 @@ class Scrape_URL:
             html = response.text
             content = self._soup(html)
             count = Counter(content.split(" ")).total()
-            print(f"Requests scrape job completed with {count} words worth of content")
+            if not self.scrape_only:
+                print(f"Requests scrape job completed with {count} words worth of content")
             return count, content
         except (requests.exceptions.HTTPError,
                 requests.exceptions.ConnectionError,
@@ -131,15 +184,20 @@ class Scrape_URL:
         # Unrecoverable: handle separately
         except (KeyboardInterrupt, SystemExit):
             print("\n[Unrecoverable] Script interrupted by user or system. Exiting.")
+            print("Exiting...")
+            time.sleep(2)
             sys.exit(1)
 
         except Exception as e:
             # Unrecoverable: unexpected bug or system error
             print(f"[Unrecoverable Error] Unexpected failure during scraping {self.url}: {e}")
+            print("Exiting...")
+            time.sleep(2)
             sys.exit(1)
 
     async def _playwright_scrape(self):
-        print("Playwright scrape job starting....")
+        if not self.scrape_only:
+            print("Playwright scrape job starting....")
 
         async def countdown_timer(duration):
             for i in range(duration + 1):
@@ -164,16 +222,12 @@ class Scrape_URL:
                 return html
 
         try:
-            action = self._detect_interactive_environment()
-
-            if action:
-                html = await run()
-            else:
-                html = asyncio.run(run())
-
+            html = await run()
+            
             content = self._soup(html)
             count = Counter(content.split(" ")).total()
-            print(f"Playwright scrape job completed with {count} words worth of content")
+            if not self.scrape_only:
+                print(f"Playwright scrape job completed with {count} words worth of content")
             return count, content
         
         except PlaywrightTimeoutError as te:
@@ -183,6 +237,8 @@ class Scrape_URL:
                 return None, None
             else:
                 print("Scraping job failed!!")
+                print("Exiting...")
+                time.sleep(2)
                 sys.exit(1)
 
         except PlaywrightError as pe:
@@ -191,11 +247,96 @@ class Scrape_URL:
                 return None, None
             else:
                 print("Scraping job failed!!")
+                print("Exiting...")
+                time.sleep(2)
                 sys.exit(1)
 
         except Exception as e:
             print(f"[Unrecoverable] Unexpected error: {e}")
+            print("Exiting...")
+            time.sleep(2)
             sys.exit(1) 
 
-    def scrape(self):
+    async def scrape(self):
+        """
+        The actual function that undertakes the scraping job
+        returns:
+        scraper - Str denoting which scraper's job is returned
+        count - The words count of content scraped
+        content - The scraped content
+        """
+        # Validaing the url string
+        valid = self.validate_url()
+        if not valid:
+            print("Please provide a proper url with scheme i.e http/s://www.<your_page>")
+            time.sleep(2)
+            sys.exit(1)
+
+        # Run synchronous _requests_scrape in an executor to not block the event loop
+        loop = asyncio.get_event_loop()
+        requests_count, requests_content = await loop.run_in_executor(None,self._requests_scrape)
+
+        requests_count = requests_count or 0
+        requests_content = requests_content or ""
+
+        requests_content_is_junk = self._is_content_junk( requests_content, requests_count)
+
+        if requests_content_is_junk:
+            playwright_count, playwright_content = await self._playwright_scrape()
+            if self.scrape_only:
+                    return playwright_content
+            else:
+                    return "playwright",playwright_count, playwright_content
+
+        # Check if requests job is satisfactory and is not junk, else start playwright scraping job
+        if self._requires_playwright(requests_count) and not requests_content_is_junk:
+            playwright_count, playwright_content = await self._playwright_scrape()
+            if playwright_count > requests_count:
+                if self.scrape_only:
+                    return playwright_content
+                else:
+                    return "playwright",playwright_count, playwright_content
+            else:
+                if self.scrape_only:
+                    return requests_content
+                else:
+                    return "requests", playwright_count ,requests_content
+            
+        if not self.scrape_only:
+            return "requests",requests_count, requests_content
+        else:
+            return requests_content
+        
+
+async def main():
+    parser = argparse.ArgumentParser(description="Scrape a webpage with requests and Playwright.")
+    parser.add_argument("--url", type = str, required=True, help="The URL of the webpage to scrape (with protocol)")
+    parser.add_argument("--threshold", "-t", default=80, type=int, help="Threshold for word count to switch to Playwright. Default 80 and not recommended to tweak.")
+    parser.add_argument("--browser", "-b", default="Chrome", type=str, help="Browser type for Playwright (Chrome, Firefox, Safari)")
+    parser.add_argument("--user-agent", "-ua", type=str, help="User-agent. The script handles User Agent passed to headers on it's own, use only if required.")
+    parser.add_argument("--scrape-only", "-s", action="store_true", help="Only return the scraped content")
+
+    args = parser.parse_args()
+
+    scraper = Scrape_URL(url=args.url, threshold=args.threshold, browser=args.browser,user_agent=args.user_agent, scrape_only=args.scrape_only)
+    # Scraping job as a script
+    content = await scraper.scrape()
+
+    if args.scrape_only:
+        if content:
+            print(content if content else f"No content scraped from {args.url}")
+
+if __name__ == "__main__":
+    if Scrape_URL._detect_interactive_environment():
+        try:
+            import nest_asyncio
+            nest_asyncio.apply()
+        except ImportError:
+            print("Warning: nest_asyncio not installed. Async operations in interactive environments might behave unexpectedly.")
+            
+    asyncio.run(main())
+
+    
+
+
         
