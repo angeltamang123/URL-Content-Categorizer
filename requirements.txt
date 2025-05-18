@@ -2,3 +2,4 @@ cloudscraper
 gradio_client
 pytest-playwright
 beautifulsoup4
+tqdm

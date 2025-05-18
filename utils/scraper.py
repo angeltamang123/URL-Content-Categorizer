@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright,TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
 from collections import Counter
 import functools
+from tqdm import tqdm
 
 # Helper function to print to stderr
 def eprint(*args, **kwargs):
@@ -202,23 +203,42 @@ class Scrape_URL:
         if not self.scrape_only:
             print("Playwright scrape job starting....")
 
-         # Timer to interactively show process running
-        async def countdown_timer_local(duration_seconds, page_to_monitor, message_prefix="Playwright waiting"):
-            for i in range(duration_seconds + 1):
-                if page_to_monitor.is_closed():
-                    eprint(f"\r{' ' * 70}\r Timer stopped.", flush=True) 
-                    break
-                # Pad with spaces to clear previous longer messages
-                eprint(f"\r{message_prefix}: {i}/{duration_seconds}s{' ' * 20}", end="", flush=True) 
-                await asyncio.sleep(1)
-            if not page_to_monitor.is_closed():
-                eprint(f"\r{message_prefix}: Wait time {duration_seconds}s elapsed.{' ' * 20}", flush=True) 
-            eprint() # Newline after timer completion/stop, to stderr
+        # A Live timer until canceled
+        async def show_elapsed_progress():
+            pbar = tqdm(
+                total=0,
+                bar_format="⏳ Elapsed: {elapsed}",
+                dynamic_ncols=True,
+                leave=False,  # don't leave the line after completion
+            )
+            try:
+                while True:
+                    await asyncio.sleep(0.1)
+                    pbar.update(0)
+            finally:
+                pbar.close()
 
-        timer_task_handle = None # To hold the asyncio.Task for the timer
+        # Runs page.goto and shows elapsed time
+        async def timed_goto(page, url, timeout_seconds=30):
+            progress_task = asyncio.create_task(show_elapsed_progress())  # start timer
+
+            try:
+                await asyncio.wait_for(
+                    page.goto(url, wait_until="domcontentloaded"),
+                    timeout=timeout_seconds
+                )
+                print(f" Finished loading {url}")
+            except asyncio.TimeoutError:
+                print(f" Timeout while loading {url}")
+            finally:
+                progress_task.cancel()  # stop timer
+                try:
+                    await progress_task
+                except asyncio.CancelledError:
+                    pass
+                
 
         async def run():
-            nonlocal timer_task_handle
             page_instance = None
             async with async_playwright() as p:
                 
@@ -229,52 +249,10 @@ class Scrape_URL:
                 context = await browser.new_context(user_agent = user_agent, extra_http_headers=headers)
 
                 page_instance = await context.new_page()
-                
-                # Timer for waiting page load 
-                async def fetch_with_timeout(page_instance, url, timeout_seconds=60):
-                    """
-                    To-do: The timer cancellation after scraping still doesn't work, 
-                    I need to check it again. For now it works, too
-                    """
-                    async def timer():
-                        await asyncio.sleep(timeout_seconds)
-                        eprint(f"Timeout of {timeout_seconds}s reached!")
 
-                    timer_task = asyncio.create_task(timer())
-                    try:
-                        await asyncio.wait_for(
-                        page_instance.goto(url, wait_until="domcontentloaded"),
-                        timeout=timeout_seconds
-                    )
-                    except asyncio.TimeoutError:
-                        eprint(f"[ERROR] Page load timed out after {timeout_seconds} seconds.")
-                        raise  
-                    finally:              
-                        # Cancel the timer if still running
-                        if not timer_task.done():
-                            timer_task.cancel()
-                            try:
-                                await timer_task
-                            except asyncio.CancelledError:
-                                eprint("Page loaded.")
+                await timed_goto(page_instance, self.url)
 
-                wait_duration_ms = 60000
-                wait_duration_s = wait_duration_ms // 1000
-
-
-
-                await fetch_with_timeout(page_instance, self.url, timeout_seconds=wait_duration_s)
-
-                # Start the countdown timer task
-                timer_task_handle = asyncio.create_task(
-                    countdown_timer_local(wait_duration_s, page_instance , f"Playwright working")
-                )
-
-                # The actual Playwright wait operation
-                main_wait_task = asyncio.create_task(
-                    page_instance.wait_for_timeout(wait_duration_ms)
-                )
-                await main_wait_task
+                await page_instance.wait_for_timeout(2000)
                 html = await page_instance.content()
                 await browser.close()
                 return html
