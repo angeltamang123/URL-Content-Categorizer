@@ -252,7 +252,7 @@ class Scrape_URL:
 
                 await timed_goto(page_instance, self.url)
 
-                await page_instance.wait_for_timeout(2000)
+                await page_instance.wait_for_timeout(10000)
                 html = await page_instance.content()
                 await browser.close()
                 return html
