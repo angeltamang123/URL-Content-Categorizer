@@ -48,7 +48,7 @@ class Categorizer:
                 result = client.predict(content, api_name="/predict")
                 print(f"The topic is categorized as {result['topic']} with the model being {result['confidence'] * 100}% confident ")
             except Exception as e:
-                    eprint(f"Ops!! Something went wrong while inferring the model: {e}")
+                    eprint(f"Ops!! Something went wrong while inferring the model: {e} \nWait few minutes for the model to cold start")
         else:
             asyncio.run(self._scrape())
 

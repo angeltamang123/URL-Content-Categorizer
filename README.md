@@ -46,7 +46,7 @@ URL-Content-Categorizer$ playwright install --with-deps
 1. Run the script, example
 
 ```bash
-URL-Content-Categorizer$  python categorize.py --url https://angel-tamang.vercel.app
+URL-Content-Categorizer$  python categorize.py --url https://angel-tamang.com.np
 ```
 
 > The topic is categorized as Education & Jobs with the model being 74.47% confident
@@ -54,7 +54,7 @@ URL-Content-Categorizer$  python categorize.py --url https://angel-tamang.vercel
 2. You can also use the script to skip inference and retreive scrapped content only with -s flag
 
 ```bash
-URL-Content-Categorizer$  python categorize.py --url https://angel-tamang.vercel.app -s
+URL-Content-Categorizer$  python categorize.py --url https://angel-tamang.com.np -s
 ```
 
 > Page loaded.
